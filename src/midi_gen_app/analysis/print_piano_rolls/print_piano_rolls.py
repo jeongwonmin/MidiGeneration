@@ -13,8 +13,10 @@ class PrintPianoRolls(object):
         if not os.path.exists(self._result_dir):
             os.makedirs(self._result_dir)
 
-    def __call__(self, loader_class):
-        for l in loader_class(self._data_dir)():
+    def __call__(self, loader):
+        if hasattr(loader, '__name__') and loader.__name__ == "MidiLoader":
+            loader = loader(self._data_dir)
+        for l in loader():
             genre_name = l['genre']
             folder_name = os.path.splitext(l['file_name'])[0]
             result_dir = os.path.join(

@@ -31,14 +31,27 @@ class MidiLoader(object):
         def get_fs(bpm):
             return 1/ (60/(bpm * 4))
 
+        def fit_chord_to_melody(melody, chord):
+            if melody.shape[1] == chord.shape[1]:
+                return melody, chord
+            elif melody.shape[1] < chord.shape[1]:
+                return melody, chord[:,:melody.shape[1]]
+            else:
+                extra = melody.shape[1] - chord.shape[1]
+                zeros = np.zeros((chord.shape[0], extra))
+                return melody, np.hstack([chord, zeros])  
+
+		# get piano roll for melody / chroma for chord
         def get_piano_roll(filepath, bpm):
             midi_obj = pm.PrettyMIDI(midi_file=filepath)
             insts = midi_obj.instruments
             melody_obj = insts[0]
             chord_obj = insts[1]
             melody = melody_obj.get_piano_roll(fs=get_fs(bpm))
-            chord = chord_obj.get_piano_roll(fs=get_fs(bpm))
-            return melody, chord
+            chord = chord_obj.get_chroma(fs=get_fs(bpm))
+            melody[melody>0] = 1
+            chord[chord>0] = 1
+            return fit_chord_to_melody(melody, chord)
 
         for k, i in self._midi_data.items():
             self._midi_data[k].update({"piano_roll":{}})
@@ -56,8 +69,6 @@ class MidiLoader(object):
                 })
 
     def __call__(self):
-        print(self._midi_data.keys())
-        print(self._midi_data["pops"].keys())
         for k, i in self._midi_data.items():
             files = i["files"]
             for f in files:
@@ -68,7 +79,3 @@ class MidiLoader(object):
                     "piano_roll": i["piano_roll"][basename],
                 }
 
-# test code
-if __name__=="__main__":
-    for loader in MidiLoader("../../../../data/hooktheory")():
-        print(loader)
