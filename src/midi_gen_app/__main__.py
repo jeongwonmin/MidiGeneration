@@ -24,4 +24,6 @@ class Main(object):
 
 if __name__=="__main__":
     main = Main(args.settings)
-    main._routine(MidiSplitter(MidiProcessor(MidiLoader(main.path))))
+    main._routine(MidiProcessor(MidiLoader(main.path)))
+    # for m in MidiSplitter(MidiProcessor(MidiLoader(main.path)))():
+    #     print(m["file_name"], m["splitted"]["melody"].shape, m["splitted"]["chord"].shape)
