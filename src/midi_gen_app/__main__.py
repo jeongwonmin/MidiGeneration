@@ -5,6 +5,7 @@ from input_output.loader.midi_processor import MidiProcessor
 from input_output.loader.midi_splitter import MidiSplitter
 from input_output.loader.settings import *
 from analysis.print_piano_rolls.print_piano_rolls import PrintPianoRolls
+from analysis.deep_learning.deep_learning import DeepLearning
 
 parser = argparse.ArgumentParser()
 parser.add_argument('settings', help='setting path')
@@ -18,7 +19,7 @@ class Main(object):
         params = conf["params"]
         self._routine = {
             "print_piano_rolls": PrintPianoRolls,
-            # "deep_learning": DeepLearning,
+            "deep_learning": DeepLearning,
         }[routine](**params)
         self.path = params["data_dir"]
         self.params = params
@@ -33,21 +34,25 @@ if __name__=="__main__":
     for m in MidiSplitter(MidiProcessor(MidiLoader(main.path)))():
         mel = m["splitted"]["melody"]
         chrd = m["splitted"]["chord"]
-        for i in range(mel.shape[0]):
-            folder = main.path
-            m_img = Image.fromarray(mel[i])
-            chrd_img = Image.fromarray(chrd[i])
-            m_flip = ImageOps.flip(m_img)
-            chrd_flip = ImageOps.flip(chrd_img)
-            fname = os.path.splitext(m["file_name"])[0]
-            save_folder = os.path.join(main.params["result_dir"], fname)
-            if not os.path.exists(save_folder):
-                os.makedirs(save_folder)
+        converted = m["splitted"]["chord_converted"]
+        # for i in range(mel.shape[0]):
+        #     folder = main.path
+        #     m_img = Image.fromarray(mel[i])
+        #     chrd_img = Image.fromarray(chrd[i])
+        #     m_flip = ImageOps.flip(m_img)
+        #     chrd_flip = ImageOps.flip(chrd_img)
+        #     fname = os.path.splitext(m["file_name"])[0]
+        #     save_folder = os.path.join(main.params["result_dir"], fname)
+        #     if not os.path.exists(save_folder):
+        #         os.makedirs(save_folder)
 
-            m_savedir = os.path.join(save_folder, 
-                "_".join(["melody", str(i)])+".tiff")
-            chrd_savedir = os.path.join(save_folder, 
-                "_".join(["chord", str(i)])+".tiff")
-            m_flip.save(m_savedir)
-            chrd_flip.save(chrd_savedir)
+        #     m_savedir = os.path.join(save_folder, 
+        #         "_".join(["melody", str(i)])+".tiff")
+        #     chrd_savedir = os.path.join(save_folder, 
+        #         "_".join(["chord", str(i)])+".tiff")
+        #     m_flip.save(m_savedir)
+        #     chrd_flip.save(chrd_savedir)
 
+        print(m["file_name"])
+        print(mel.shape, chrd.shape, converted.shape)
+        print(converted)
