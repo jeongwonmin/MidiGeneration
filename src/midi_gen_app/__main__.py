@@ -54,5 +54,4 @@ if __name__=="__main__":
         #     chrd_flip.save(chrd_savedir)
 
         print(m["file_name"])
-        print(mel.shape, chrd.shape, converted.shape)
-        print(converted)
+        # print(mel.shape, chrd.shape, converted.shape)

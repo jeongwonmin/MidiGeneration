@@ -54,7 +54,30 @@ class MidiProcessor(object):
         ]
         return np.all(chk)
 
+    # get shift size to adjust melody between C4 and B5
+    def _adjust_melody_c4b5(self, melody):
+        melody_range = np.sort(np.unique(np.nonzero(melody)[0]))
+        max_note = melody_range[-1]
+        min_note = melody_range[0]
+        gap = max_note - min_note
+        if gap >= 24:
+            return None
+
+        c4 = 48
+        b5 = 71
+        if min_note >= c4 and max_note <= b5:
+            return 0
+        elif max_note <= c4:
+            return (c4 - max_note) + gap + 1
+        elif min_note >= b5:
+            return ((min_note - b5) + gap + 1) * (-1)
+        elif min_note < c4 and max_note <= b5:
+            return c4 - min_note
+        elif min_note > c4 and max_note >= b5:
+            return (-1) * (max_note - b5)
+            
     def __call__(self):
+        count = 0
         for l in self._loader():
             melody = l["piano_roll"]["melody"]
             chord = l["piano_roll"]["chord"]
@@ -66,4 +89,15 @@ class MidiProcessor(object):
             elif not self._valid_chord(l["piano_roll"]["chord"]):
                 print(l["file_name"], "contains invalid chord")
                 continue
+            elif self._adjust_melody_c4b5(l["piano_roll"]["melody"]) is None:
+                continue
+            r = self._adjust_melody_c4b5(l["piano_roll"]["melody"])
+            l["piano_roll"]["melody"] = np.roll(
+                l["piano_roll"]["melody"], r, axis=0
+            )
+            l["piano_roll"]["chord"] = np.roll(
+                l["piano_roll"]["chord"], r, axis=0
+            )
             yield l
+            count += 1
+        print(count)
