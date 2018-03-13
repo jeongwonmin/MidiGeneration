@@ -29,7 +29,7 @@ class MidiLoader(object):
 
     def _add_piano_roll(self):
         def get_fs(bpm):
-            return 1/ (60/(bpm * 4))
+            return 1.0/ (60.0/(bpm * 4))
 
         def fit_chord_to_melody(melody, chord):
             if melody.shape[1] == chord.shape[1]:
