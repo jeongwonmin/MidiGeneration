@@ -78,4 +78,3 @@ class MidiLoader(object):
                     "file_name": basename,
                     "piano_roll": i["piano_roll"][basename],
                 }
-

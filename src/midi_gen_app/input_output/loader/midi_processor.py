@@ -77,7 +77,6 @@ class MidiProcessor(object):
             return (-1) * (max_note - b5)
             
     def __call__(self):
-        count = 0
         for l in self._loader():
             melody = l["piano_roll"]["melody"]
             chord = l["piano_roll"]["chord"]
@@ -92,12 +91,25 @@ class MidiProcessor(object):
             elif self._adjust_melody_c4b5(l["piano_roll"]["melody"]) is None:
                 continue
             r = self._adjust_melody_c4b5(l["piano_roll"]["melody"])
-            l["piano_roll"]["melody"] = np.roll(
-                l["piano_roll"]["melody"], r, axis=0
-            )
-            l["piano_roll"]["chord"] = np.roll(
-                l["piano_roll"]["chord"], r, axis=0
-            )
+
+            l["piano_roll"].update({
+                "adjusted": {}
+            })
+
+            l["piano_roll"]["adjusted"].update({
+                "melody_base": np.roll(l["piano_roll"]["melody"], r, axis=0),
+                "chord_base": np.roll(l["piano_roll"]["chord"], r, axis=0),
+            })
+
+            for i in range(-6, 7):
+                melody_base = l["piano_roll"]["adjusted"]["melody_base"]
+                chord_base = l["piano_roll"]["adjusted"]["chord_base"]
+                if i == 0: 
+                    continue
+                mk = "_".join(["melody", str(i)])
+                ck = "_".join(["chord", str(i)])
+                l["piano_roll"]["adjusted"].update({
+                    mk: np.roll(melody_base, i, axis=0),
+                    ck: np.roll(chord_base, i, axis=0),
+                })
             yield l
-            count += 1
-        print(count)

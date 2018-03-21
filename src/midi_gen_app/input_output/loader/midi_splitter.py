@@ -8,7 +8,7 @@ class MidiSplitter(object):
         self._processor = processor
 
     # split into bars
-    def _split_into_bars(self, piano_roll):
+    def _split_into_bars(self, proll):
         def fill_last(last, first):
             first_notes = first.shape[1]
             last_notes = last.shape[1]
@@ -16,24 +16,15 @@ class MidiSplitter(object):
             fill_last = np.tile(last[:,-1][:,None], (1, fill))
             return np.hstack([last, fill_last])
 
-        melody = piano_roll["melody"]
-        chord = piano_roll["chord"]
-        
-        melody = [
-            melody[:,i:min(i+16, melody.shape[1])] 
-            for i in range(0, melody.shape[1], 16)
+        proll_bars = [
+            proll[:,i:min(i+16, proll.shape[1])] 
+            for i in range(0, proll.shape[1], 16)
         ]
-        if melody[-1].shape != melody[0].shape:
-            melody[-1] = fill_last(melody[-1], melody[0])
 
-        chord = [
-            chord[:, i:min(i+16, chord.shape[1])]
-            for i in range(0, chord.shape[1], 16)
-        ]
-        if chord[-1].shape != chord[0].shape:
-            chord[-1] = fill_last(chord[-1], chord[0])
+        if proll_bars[-1].shape != proll_bars[0].shape:
+            proll_bars[-1] = fill_last(proll_bars[-1], proll_bars[0])
 
-        return np.asarray(melody), np.asarray(chord)
+        return np.asarray(proll_bars)
 
     # convert major/minor chord to 13-dim chord(in MidiNet paper)
     # shape is (13, 16) -> 13: chord-dim, 16: from minimum note length 1/16
@@ -71,20 +62,36 @@ class MidiSplitter(object):
             chord_dim13 = convert_to_13dim(
                 mask_major, mask_minor, chord_tile[:,0]
             )
-            chord_dim13 = np.tile(chord_dim13[:,None], (1,16))
+            # chord_dim13 = np.tile(chord_dim13[:,None], (1,16))
             splitted.append(chord_dim13)
         return np.asarray(splitted)
+
+    def _get_keys_from_pattern(self, pattern, p_list):
+        keys = [] 
+        for p in p_list:
+            if p.find(pattern) != -1:
+                keys.append(p)
+        return keys   
 
     def __call__(self):
         np.set_printoptions(threshold=np.inf)
         for p in self._processor():
-            mel, chord = self._split_into_bars(p["piano_roll"])
-            p.update({
-                "splitted":{
-                    "melody": mel,
-                    "chord": chord,
-                    "chord_converted": self._convert_chord(chord),
-                }
-            }) 
+            a = p["piano_roll"]["adjusted"]
+            mel_keys = self._get_keys_from_pattern("melody", a.keys())
+            chord_keys = self._get_keys_from_pattern("chord", a.keys())
+
+            for mk in mel_keys:
+                splitted_m = self._split_into_bars(a[mk])
+                if "splitted" not in p.keys():
+                    p.update({"splitted": {}})
+                p["splitted"].update({mk: splitted_m})
+
+            for ck in chord_keys:
+                splitted_c = self._split_into_bars(a[ck])
+                p["splitted"].update({
+                    ck: splitted_c,
+                    "_".join([ck, "converted"]): \
+                        self._convert_chord(splitted_c),
+                    })
             yield p
 
