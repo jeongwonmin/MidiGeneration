@@ -46,9 +46,12 @@ class BatchLoader(object):
                 if roll[0].shape[0] < 2:
                     continue
                 for i in range(roll[0].shape[0]-1):
-                    mels.append(roll[0][1:][i])
-                    mel_prevs.append(roll[0][:-1][i])
-                    chrds.append(roll[1][1:][i])
+                    mels.append(roll[0][:][i])
+                    if i == 0:
+                        mel_prevs.append(np.zeros(roll[0][:][i].shape))
+                    else:
+                        mel_prevs.append(roll[0][:][i-1])
+                    chrds.append(roll[1][:][i])
 
         return np.asarray(mels), np.asarray(mel_prevs), np.asarray(chrds)
 
