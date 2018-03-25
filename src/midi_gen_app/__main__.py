@@ -27,5 +27,5 @@ class Main(object):
 
 if __name__=="__main__":
     main = Main(args.settings)
-
+    main._routine()
 

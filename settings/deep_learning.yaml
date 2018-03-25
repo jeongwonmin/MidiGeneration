@@ -1,0 +1,26 @@
+routine: deep_learning
+params:
+    data_dir: "/Users/MIN/my_workspace/MidiGeneration/data/hooktheory"
+    dataset_name: "hooktheory"
+    npy_dir: "/Users/MIN/my_workspace/MidiGeneration/results/20180324-154201/npy_data" # npy data dir
+    result_dir: "/Users/MIN/my_workspace/MidiGeneration/results"
+    sample_dir: "/Users/MIN/my_workspace/MidiGeneration/results/samples"
+    checkpoint_dir:
+    epoch: 10
+    class: "MidiNet"
+    learning_params:
+        learning_rate: 0.00005
+        beta1: 0.5
+    model_params:
+        batch_size: 72
+        sample_size: 72
+        output_w: 16
+        output_h: 128
+        y_dim: 13
+        prev_dim: 1
+        z_dim: 100
+        gf_dim: 64
+        df_dim: 64
+        gfc_dim: 1024
+        dfc_dim: 1024
+        c_dim: 1
