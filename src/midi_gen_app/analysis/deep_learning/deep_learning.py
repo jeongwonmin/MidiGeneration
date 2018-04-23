@@ -118,10 +118,12 @@ class DeepLearning(object):
             self.model = model_class(
                 self.params["model_params"], 
                 self._path, 
-                **self.data_kwargs, 
-                sess=session
+                session,
+                **self.data_kwargs 
             )
             self.model.init_layers()
+            print("init layers")
             self.model(self.params)
+            print("train start")
         tf.app.run()
 

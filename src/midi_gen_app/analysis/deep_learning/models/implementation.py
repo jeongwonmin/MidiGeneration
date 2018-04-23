@@ -11,9 +11,9 @@ class Implementation(object):
     def __init__(
         self,
         model_params, 
-        dl_path, 
+        dl_path,
+        sess,
         mels, mel_prevs, chords, 
-        sess=None,  
         ):
         self._path = dl_path
         self.sess = sess
@@ -85,7 +85,6 @@ class Implementation(object):
             return True
         else:
             return False
-
 
     def __call__(self, params):
         self.train(params)
