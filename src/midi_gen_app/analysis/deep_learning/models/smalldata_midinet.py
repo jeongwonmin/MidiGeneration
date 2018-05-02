@@ -44,9 +44,11 @@ class SmallDataMidiNet(MidiNet):
         self.dfc_dim = model_params["dfc_dim"]
         self.c_dim = model_params["c_dim"]
 
+        self.small_rate = model_params["small_rate"]
+
     def train(self, params):
         self.pretrain(params)
-
+        self.fine_tuning(params)
         # fine tuning with novel set + small dataset
 
         # generate data
@@ -70,11 +72,11 @@ class SmallDataMidiNet(MidiNet):
         learning_rate = params["learning_params"]["learning_rate"]
         beta1 = params["learning_params"]["beta1"]
 
-        d_optim = tf.train.AdamOptimizer(
+        self.d_optim = tf.train.AdamOptimizer(
             learning_rate=learning_rate, beta1=beta1
         ).minimize(self.d_loss, var_list=self.d_vars)
 
-        g_optim = tf.train.AdamOptimizer(
+        self.g_optim = tf.train.AdamOptimizer(
             learning_rate=learning_rate, beta1=beta1
         ).minimize(self.g_loss, var_list=self.g_vars)
                                   
@@ -132,19 +134,19 @@ class SmallDataMidiNet(MidiNet):
                 batch_z = np.random.normal(0, 1, [self.batch_size, self.z_dim]) \
                             .astype(np.float32)
                 
-                # Update D network
-                _, summary_str = self.sess.run([d_optim, self.d_sum],
+                # Update D network / save d_w for fine tuning
+                self.d_w, summary_str = self.sess.run([self.d_optim, self.d_sum],
                     feed_dict={ self.images: batch_images, self.z: batch_z ,self.y:batch_labels, self.prev_bar:prev_batch_images })
                 self.writer.add_summary(summary_str, counter)
 
                 # Update G network
-                _, summary_str = self.sess.run([g_optim, self.g_sum],
+                self.g_w, summary_str = self.sess.run([self.g_optim, self.g_sum],
                         feed_dict={ self.images: batch_images, self.z: batch_z ,self.y:batch_labels, self.prev_bar:prev_batch_images })
                 self.writer.add_summary(summary_str, counter)
 
                 # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
                 # We've tried to run more d_optim and g_optim, while getting a better result by running g_optim twice in this MidiNet version.
-                _, summary_str = self.sess.run([g_optim, self.g_sum],
+                self.g_w, summary_str = self.sess.run([self.g_optim, self.g_sum],
                         feed_dict={ self.images: batch_images, self.z: batch_z ,self.y:batch_labels, self.prev_bar:prev_batch_images })
                 self.writer.add_summary(summary_str, counter)
                     
@@ -156,7 +158,6 @@ class SmallDataMidiNet(MidiNet):
                 print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
                     % (epoch, idx, batch_idxs,
                         time.time() - start_time, errD_fake+errD_real, errG))
-
                 if np.mod(counter, 100) == 1:
                     
                     samples, d_loss, g_loss = self.sess.run(
@@ -186,9 +187,6 @@ class SmallDataMidiNet(MidiNet):
     def fine_tuning(self, params):
         def process_data(X, prev_X, y):
             X, prev_X, y = self.extract(X, prev_X, y)
-            X, prev_X, y = shuffle(
-                X, prev_X, y, random_state=0
-            )
             X = np.transpose(X, (0,2,3,1))
             prev_X = np.transpose(prev_X, (0,2,3,1))
             return X, prev_X, y
@@ -196,22 +194,173 @@ class SmallDataMidiNet(MidiNet):
         novel_data_X = self.novel_mels
         novel_prev_X = self.novel_prevs
         novel_data_y = self.novel_chords
+        small_data_X = self.small_mels
+        small_prev_X = self.small_prevs
+        small_data_y = self.small_chords
 
         novel_data_X, novel_prev_X, novel_data_y = \
             process_data(novel_data_X, novel_prev_X, novel_data_y)
 
+        small_data_X, small_prev_X, small_data_y = \
+            process_data(small_data_X, small_prev_X, small_data_y)
+
         learning_rate = params["learning_params"]["learning_rate"]
         beta1 = params["learning_params"]["beta1"]
 
-        d_optim = tf.train.AdamOptimizer(
-            learning_rate=learning_rate, beta1=beta1
-        ).minimize(self.d_loss, var_list=self.d_vars)
+        # small batches (novel:small = small_rate:1)
+        small_batch_n = len(novel_data_X) // self.small_rate
+ 
+        # initialize with pretrained model                          
+        # tf.global_variables_initializer().run(self.d_w)
+        # tf.global_variables_initializer().run(self.g_w)
 
-        g_optim = tf.train.AdamOptimizer(
-            learning_rate=learning_rate, beta1=beta1
-        ).minimize(self.g_loss, var_list=self.g_vars)
-                                  
-        tf.global_variables_initializer().run()
+        # generate from small dataset (only use filtered generation results)
+        gen_small = []
+        gen_y = []
+        gen_prev = [] # use the original previous melody
+        # generate by using small data -> filter by discriminator
+        batch_idxs = len(small_data_X) // self.batch_size
+        seed = 10000000
+        thres = 0.4 # sigmoid threshold
+        while len(gen_small) <= small_batch_n:
+            for idx in xrange(0, batch_idxs):
+                batch_images = \
+                    small_data_X[idx*self.batch_size:(idx+1)*self.batch_size]
+                prev_batch_images = \
+                    small_prev_X[idx*self.batch_size:(idx+1)*self.batch_size]
+                
+                batch_labels = \
+                    small_data_y[idx*self.batch_size:(idx+1)*self.batch_size]
+                '''
+                Note that the mu and sigma are set to (-1,1) in the experiment of the paper :
+                "MidiNet: A Convolutional Generative Adversarial Network for Symbolic-domain Music Generation"
+                However, the result are similar by using (0,1)
+                '''
+                np.random.seed(seed)
+                batch_z = np.random.normal(0, 1, [self.batch_size, self.z_dim]) \
+                            .astype(np.float32)
+                seed += 1
+
+                z = tf.convert_to_tensor(batch_z, np.float32)
+                y = tf.convert_to_tensor(batch_labels, np.float32)
+                prev = tf.convert_to_tensor(prev_batch_images, np.float32)
+                gen = self.generator(z, y, prev, reuse=True)
+                # filter with discriminator
+                d, d_logits, fm = self.discriminator(
+                    gen, y, reuse=True
+                )
+                d_np = d.eval()
+                gen_np = gen.eval()
+
+                # 8小節ごとに切って「直前の小説」を取っておく
+                filter_r = np.where(d_np>thres)[0]
+                gen_small = gen_small + gen_np[filter_r,:,:,:].tolist()
+                gen_y = gen_y + batch_labels[filter_r,:].tolist()
+        gen_small = np.array(gen_small)
+        gen_y = np.array(gen_y)
+        gen_prev = np.concatenate((
+            np.zeros(gen_small[0].shape)[None,:,:,:],
+            gen_small[:gen_small.shape[0]-1]
+        ))
+
+        novel_small_X = np.r_[novel_data_X, small_data_X, gen_small]
+        novel_small_p = np.r_[novel_prev_X, small_prev_X, gen_prev] # prev: preparing...
+        novel_small_y = np.r_[novel_data_y, small_data_y, gen_y]
+        novel_small_X, novel_small_p, novel_small_y = \
+            shuffle(
+                novel_small_X, novel_small_p, novel_small_y, random_state=1
+            )
+
+        sample_labels = sloppy_sample_labels()
+        counter=0
+        start_time = time.time()
+        sample_z = np.random.normal(0, 1, size=(self.sample_size , self.z_dim))
+        sample_images = novel_small_X[0:self.sample_size]
+        sample_dir = os.path.join(self._path, "fine_sample_dir")
+        if not os.path.exists(sample_dir):
+            os.makedirs(sample_dir)
+        save_images(
+            novel_small_X[np.arange(len(novel_small_X))[:5]]*1, [1, 5],
+            os.path.join(sample_dir, 'fine_Train.png')
+        )
+        checkpoint_dir = os.path.join(self._path, "fine_checkpoint")       
+        if not os.path.exists(sample_dir):
+            os.makedirs(sample_dir)        
+
+        for epoch in xrange(params["fine_tuning_epoch"]):
+            batch_idxs = len(novel_small_X) // self.batch_size
+            for idx in xrange(0, batch_idxs):
+                batch_images = \
+                    novel_small_X[idx*self.batch_size:(idx+1)*self.batch_size]
+                prev_batch_images = \
+                    novel_small_p[idx*self.batch_size:(idx+1)*self.batch_size]
+                
+                batch_labels = \
+                    novel_small_y[idx*self.batch_size:(idx+1)*self.batch_size]
+                '''
+                Note that the mu and sigma are set to (-1,1) in the experiment of the paper :
+                "MidiNet: A Convolutional Generative Adversarial Network for Symbolic-domain Music Generation"
+                However, the result are similar by using (0,1)
+                '''
+                batch_z = np.random.normal(0, 1, [self.batch_size, self.z_dim]) \
+                            .astype(np.float32)
+                
+                # Update D network / save d_w for fine tuning
+                self.d_w, summary_str = self.sess.run([self.d_optim, self.d_sum],
+                    feed_dict={ self.images: batch_images, self.z: batch_z ,self.y:batch_labels, self.prev_bar:prev_batch_images })
+                self.writer.add_summary(summary_str, counter)
+
+                # Update G network
+                self.g_w, summary_str = self.sess.run([self.g_optim, self.g_sum],
+                        feed_dict={ self.images: batch_images, self.z: batch_z ,self.y:batch_labels, self.prev_bar:prev_batch_images })
+                self.writer.add_summary(summary_str, counter)
+
+                # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
+                # We've tried to run more d_optim and g_optim, while getting a better result by running g_optim twice in this MidiNet version.
+                self.g_w, summary_str = self.sess.run([self.g_optim, self.g_sum],
+                        feed_dict={ self.images: batch_images, self.z: batch_z ,self.y:batch_labels, self.prev_bar:prev_batch_images })
+                self.writer.add_summary(summary_str, counter)
+                    
+                errD_fake = self.d_loss_fake.eval({self.z: batch_z, self.y:batch_labels, self.prev_bar:prev_batch_images })
+                errD_real = self.d_loss_real.eval({self.images: batch_images, self.y:batch_labels })
+                errG = self.g_loss.eval({self.images: batch_images, self.z: batch_z, self.y:batch_labels, self.prev_bar:prev_batch_images })
+                
+                counter += 1
+                print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
+                    % (epoch, idx, batch_idxs,
+                        time.time() - start_time, errD_fake+errD_real, errG))
+                if np.mod(counter, 100) == 1:
+                    
+                    samples, d_loss, g_loss = self.sess.run(
+                        [self.sampler, self.d_loss, self.g_loss],
+                        feed_dict={self.z: sample_z, self.images: sample_images, self.y:sample_labels, self.prev_bar:prev_batch_images }
+                    )
+                    filename = 'fine_train_{:02d}_{:04d}.png'.format(epoch, idx)
+                    save_images(
+                        samples[:5,:], [1, 5],
+                        os.path.join(sample_dir, filename)
+                    )
+                    print("[Sample] d_loss: %.8f, g_loss: %.8f" % (d_loss, g_loss))
+
+                    gen_dir = os.path.join(self._path, "fine_gen")
+                    if not os.path.exists(gen_dir):
+                        os.makedirs(gen_dir)
+                    np_name = 'fine_train_{:02d}_{:04d}'.format(epoch, idx)
+                    np_name = os.path.join(gen_dir, np_name)
+                    np.save(np_name, samples)
+
+                if np.mod(counter, len(novel_small_X)/self.batch_size) == 0:
+                    self.save(checkpoint_dir, counter)
+            print("Epoch: [%2d] time: %4.4f, d_loss: %.8f" \
+            % (epoch, 
+                time.time() - start_time, (errD_fake+errD_real)/batch_idxs))
+
+
         # small dataset->augmentation by using generation network
         # novel dataset->no generation
         # fine-tuning of discriminator
+
+        print("fine tuning ended")
+
+    def __call__(self, params):
+        self.train(params)

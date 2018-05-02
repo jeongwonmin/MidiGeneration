@@ -24,8 +24,12 @@ class Main(object):
         }[routine](**params)
         self.path = params["data_dir"]
         self.params = params
+        if routine == "print_piano_rolls":
+            self._loader = MidiSplitter(MidiProcessor(MidiLoader(self.path))) 
 
 if __name__=="__main__":
     main = Main(args.settings)
-    main._routine()
+    l = main._loader if main._routine.__class__.__name__=="PrintPianoRolls" \
+        else None
+    main._routine(l)
 

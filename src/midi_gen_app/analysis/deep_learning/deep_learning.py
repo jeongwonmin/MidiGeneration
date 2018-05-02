@@ -96,17 +96,18 @@ class DeepLearning(object):
                 "novel_chords": novel_chords,
             })
 
-            small_mels, small_prevs, small_chords = None, None, None
+            small_loader = BatchLoader(
+                MidiSplitter(MidiProcessor(MidiLoader(
+                    data_dir,
+                    genres=["small"]
+            ))))
+
+            small_mels, small_prevs, small_chords = small_loader()
             self.data_kwargs.update({
                 "small_mels": small_mels,
                 "small_prevs": small_prevs,
                 "small_chords": small_chords,
             })
-            # small_data_loader = BatchLoader(
-            #         MidiSplitter(MidiProcessor(MidiLoader(
-            #         data_dir,
-            #         genres=["small"]
-            # ))))
 
     def __call__(self):
         model_class = {
@@ -125,5 +126,5 @@ class DeepLearning(object):
             print("init layers")
             self.model(self.params)
             print("train start")
-        tf.app.run()
+        # tf.app.run(main=None, argv=None)
 

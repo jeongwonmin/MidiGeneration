@@ -304,8 +304,10 @@ class MidiNet(Implementation):
                 
                 return tf.nn.sigmoid(h3), h3, fm
 
-    def generator(self, z, y=None, prev_x = None):
+    def generator(self, z, y=None, prev_x = None, reuse=False):
         with tf.variable_scope("generator") as scope:
+            if reuse:
+                scope.reuse_variables()
             h0_prev = lrelu(self.g_prev_bn0(conv2d(
                 prev_x, 16, k_h=1, k_w=128,d_h=1, d_w=2, name='g_h0_prev_conv'
             )))

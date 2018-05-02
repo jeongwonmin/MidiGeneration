@@ -30,9 +30,15 @@ class PrintPianoRolls(object):
             if not os.path.exists(result_dir):
                 os.makedirs(result_dir)
 
-            for k, i in l['piano_roll'].items():
-                filename = "_".join([folder_name, k])+".tiff"
-                img = Image.fromarray(i)
-                im_flip = ImageOps.flip(img)
-                save_path = os.path.join(result_dir, filename)
-                im_flip.save(save_path)
+            # print for splitted piano roll by bar
+            # for k, i in l['piano_roll'].items():
+            for k, i in l['splitted'].items():
+                basename = "_".join([folder_name, k])
+                for j in range(i.shape[0]):
+                    filename = "_".join([basename, str(j)])+".tiff"
+                    if len(i[j].shape) != 2:
+                        continue
+                    img = Image.fromarray(i[j])
+                    im_flip = ImageOps.flip(img)
+                    save_path = os.path.join(result_dir, filename)
+                    im_flip.save(save_path)
