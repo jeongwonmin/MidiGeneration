@@ -1,4 +1,6 @@
 import argparse
+import shutil
+import os
 
 from input_output.loader.midi_loader import MidiLoader
 from input_output.loader.midi_processor import MidiProcessor
@@ -26,6 +28,9 @@ class Main(object):
         self.params = params
         if routine == "print_piano_rolls":
             self._loader = MidiSplitter(MidiProcessor(MidiLoader(self.path))) 
+        setting_fname = os.path.basename(setting_path)
+        result_file = os.path.join(self._routine._path, setting_fname)
+        shutil.copyfile(setting_path, result_file)
 
 if __name__=="__main__":
     main = Main(args.settings)

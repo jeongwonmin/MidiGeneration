@@ -45,6 +45,7 @@ class SmallDataMidiNet(MidiNet):
         self.c_dim = model_params["c_dim"]
 
         self.small_rate = model_params["small_rate"]
+        self.pretrained_model = model_params["pretrained_model"]
 
     def train(self, params):
         self.pretrain(params)
@@ -110,8 +111,12 @@ class SmallDataMidiNet(MidiNet):
         counter = 0
         start_time = time.time()
 
-        if self.load(checkpoint_dir):
-            print(" [*] Load SUCCESS")
+        # if self.load(checkpoint_dir):
+        if self.pretrained_model is not None:
+            if self.load(self.pretrained_model):
+                print(" [*] Load SUCCESS")
+            else:
+                print(" [!] Load failed...")
         else:
             print(" [!] Load failed...")
         
@@ -221,7 +226,7 @@ class SmallDataMidiNet(MidiNet):
         # generate by using small data -> filter by discriminator
         batch_idxs = len(small_data_X) // self.batch_size
         seed = 10000000
-        thres = 0.4 # sigmoid threshold
+        thres = 0.5 # sigmoid threshold
         while len(gen_small) <= small_batch_n:
             for idx in xrange(0, batch_idxs):
                 batch_images = \
@@ -251,6 +256,12 @@ class SmallDataMidiNet(MidiNet):
                 )
                 d_np = d.eval()
                 gen_np = gen.eval()
+                gen_prev = np.array([
+                    np.zeros(gen_np[0].shape) if i % 8 == 0 
+                    else gen_np[i-1] for i in range(len(gen_np))
+                ])
+                print(gen_np.shape)
+                print(gen_prev.shape)
 
                 # 8小節ごとに切って「直前の小説」を取っておく
                 filter_r = np.where(d_np>thres)[0]

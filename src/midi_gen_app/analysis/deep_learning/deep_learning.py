@@ -109,7 +109,7 @@ class DeepLearning(object):
                 "small_chords": small_chords,
             })
 
-    def __call__(self):
+    def __call__(self, loader=None):
         model_class = {
             "MidiNet": MidiNet,
             "SmallDataMidiNet": SmallDataMidiNet,

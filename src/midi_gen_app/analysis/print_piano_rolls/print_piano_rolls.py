@@ -9,14 +9,14 @@ class PrintPianoRolls(object):
         self._data_dir = params['data_dir']
         result_dir = params['result_dir']
         subdir = datetime.now().strftime("%Y%m%d-%H%M%S")
-        self._result_dir = os.path.join(result_dir, subdir)
-        if not os.path.exists(self._result_dir):
-            os.makedirs(self._result_dir)
+        self._path = os.path.join(result_dir, subdir)
+        if not os.path.exists(self._path):
+            os.makedirs(self._path)
 
     def set_child_dir(self, child):
-        self._result_dir = os.path.join(self._result_dir, child)
-        if not os.path.exists(self._result_dir):
-            os.makedirs(self._result_dir)
+        self._path = os.path.join(self._path, child)
+        if not os.path.exists(self._path):
+            os.makedirs(self._path)
 
     def __call__(self, loader):
         if hasattr(loader, '__name__') and loader.__name__ == "MidiLoader":
@@ -25,7 +25,7 @@ class PrintPianoRolls(object):
             genre_name = l['genre']
             folder_name = os.path.splitext(l['file_name'])[0]
             result_dir = os.path.join(
-                self._result_dir, genre_name, folder_name
+                self._path, genre_name, folder_name
             )
             if not os.path.exists(result_dir):
                 os.makedirs(result_dir)
