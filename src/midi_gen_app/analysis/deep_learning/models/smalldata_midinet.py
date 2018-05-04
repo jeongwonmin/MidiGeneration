@@ -106,6 +106,8 @@ class SmallDataMidiNet(MidiNet):
             os.path.join(sample_dir, 'Train.png')
         )
         checkpoint_dir = os.path.join(self._path, "checkpoint")       
+        if not os.path.exists(checkpoint_dir):
+            os.makedirs(checkpoint_dir)
  
         sample_images = base_data_X[0:self.sample_size]
         counter = 0
@@ -183,8 +185,8 @@ class SmallDataMidiNet(MidiNet):
                     np_name = os.path.join(gen_dir, np_name)
                     np.save(np_name, samples)
 
-                if np.mod(counter, len(base_data_X)/self.batch_size) == 0:
-                    self.save(checkpoint_dir, counter)
+            if epoch % 5 == 0 or epoch == params["pretraining_epoch"] - 1:
+                self.save(checkpoint_dir, epoch)
             print("Epoch: [%2d] time: %4.4f, d_loss: %.8f" \
             % (epoch, 
                 time.time() - start_time, (errD_fake+errD_real)/batch_idxs))
@@ -213,7 +215,12 @@ class SmallDataMidiNet(MidiNet):
         beta1 = params["learning_params"]["beta1"]
 
         # small batches (novel:small = small_rate:1)
-        small_batch_n = len(novel_data_X) // self.small_rate
+        # if you don't use novel set, set small_rate=0
+        if self.small_rate != 0:
+            small_batch_n = len(novel_data_X) // self.small_rate
+        else:
+            small_batch_n = len(self.base_mels) // 50
+            print(small_batch_n)
  
         # initialize with pretrained model                          
         # tf.global_variables_initializer().run(self.d_w)
@@ -226,8 +233,11 @@ class SmallDataMidiNet(MidiNet):
         # generate by using small data -> filter by discriminator
         batch_idxs = len(small_data_X) // self.batch_size
         seed = 10000000
-        thres = 0.5 # sigmoid threshold
+        thres = 0.4 # sigmoid threshold
         while len(gen_small) <= small_batch_n:
+            i = len(gen_small)
+            if i % 20 == 0:
+                print("small data length: {} / {}".format(i, small_batch_n))
             for idx in xrange(0, batch_idxs):
                 batch_images = \
                     small_data_X[idx*self.batch_size:(idx+1)*self.batch_size]
@@ -260,8 +270,6 @@ class SmallDataMidiNet(MidiNet):
                     np.zeros(gen_np[0].shape) if i % 8 == 0 
                     else gen_np[i-1] for i in range(len(gen_np))
                 ])
-                print(gen_np.shape)
-                print(gen_prev.shape)
 
                 # 8小節ごとに切って「直前の小説」を取っておく
                 filter_r = np.where(d_np>thres)[0]
@@ -274,9 +282,15 @@ class SmallDataMidiNet(MidiNet):
             gen_small[:gen_small.shape[0]-1]
         ))
 
-        novel_small_X = np.r_[novel_data_X, small_data_X, gen_small]
-        novel_small_p = np.r_[novel_prev_X, small_prev_X, gen_prev] # prev: preparing...
-        novel_small_y = np.r_[novel_data_y, small_data_y, gen_y]
+        if self.small_rate != 0:
+            novel_small_X = np.r_[novel_data_X, small_data_X, gen_small]
+            novel_small_p = np.r_[novel_prev_X, small_prev_X, gen_prev] # prev: preparing...
+            novel_small_y = np.r_[novel_data_y, small_data_y, gen_y]
+        else:
+            novel_small_X = np.r_[small_data_X, gen_small]
+            novel_small_p = np.r_[small_prev_X, gen_prev] # prev: preparing...
+            novel_small_y = np.r_[small_data_y, gen_y]
+
         novel_small_X, novel_small_p, novel_small_y = \
             shuffle(
                 novel_small_X, novel_small_p, novel_small_y, random_state=1
@@ -297,6 +311,8 @@ class SmallDataMidiNet(MidiNet):
         checkpoint_dir = os.path.join(self._path, "fine_checkpoint")       
         if not os.path.exists(sample_dir):
             os.makedirs(sample_dir)        
+        if not os.path.exists(checkpoint_dir):
+            os.makedirs(checkpoint_dir)
 
         for epoch in xrange(params["fine_tuning_epoch"]):
             batch_idxs = len(novel_small_X) // self.batch_size
@@ -360,7 +376,7 @@ class SmallDataMidiNet(MidiNet):
                     np_name = os.path.join(gen_dir, np_name)
                     np.save(np_name, samples)
 
-                if np.mod(counter, len(novel_small_X)/self.batch_size) == 0:
+                if np.mod(counter, batch_idxs) == 1:
                     self.save(checkpoint_dir, counter)
             print("Epoch: [%2d] time: %4.4f, d_loss: %.8f" \
             % (epoch, 
