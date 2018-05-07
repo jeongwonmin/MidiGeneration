@@ -1,12 +1,12 @@
 routine: deep_learning
 params:
-    data_dir: "/Users/MIN/my_workspace/MidiGeneration/data/hooktheory/small_dataset"
+    data_dir: "/Users/MIN/my_workspace/midi_dataset/hooktheory/small_dataset"
     dataset_name: "hooktheory"
     npy_dir: #"/Users/MIN/my_workspace/MidiGeneration/results/20180324-154201/npy_data" # npy data dir
     result_dir: "/Users/MIN/my_workspace/MidiGeneration/results"
     sample_dir: "/Users/MIN/my_workspace/MidiGeneration/results/samples"
-    checkpoint_dir:
-    epoch: 10
+    pretraining_epoch: 0 # 10
+    fine_tuning_epoch: 100 # 10
     class: "SmallDataMidiNet"
     learning_params:
         learning_rate: 0.00005
@@ -24,3 +24,5 @@ params:
         gfc_dim: 1024
         dfc_dim: 1024
         c_dim: 1
+        small_rate: 5 # novel:small=10:1
+        pretrained_model: "/Users/MIN/my_workspace/MidiGeneration/results/20180507-001253/checkpoint" # 20180507-001253: 10epoch+10epoch # pretained model file(result/yyyyddmm-HHMMSS/checkpoint

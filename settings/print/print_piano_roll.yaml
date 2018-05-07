@@ -1,0 +1,7 @@
+routine: print_piano_rolls
+params:
+    data_dir: "/Users/MIN/my_workspace/MidiGeneration/data/hooktheory"
+    dataset_name: "hooktheory"
+    npy_dir: #"/Users/MIN/my_workspace/MidiGeneration/results/20180324-154201/npy_data" # npy data dir
+    result_dir: "/Users/MIN/my_workspace/MidiGeneration/results"
+

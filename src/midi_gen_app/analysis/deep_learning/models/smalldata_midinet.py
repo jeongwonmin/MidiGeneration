@@ -185,11 +185,11 @@ class SmallDataMidiNet(MidiNet):
                     np_name = os.path.join(gen_dir, np_name)
                     np.save(np_name, samples)
 
-            if epoch % 5 == 0 or epoch == params["pretraining_epoch"] - 1:
-                self.save(checkpoint_dir, epoch)
-            print("Epoch: [%2d] time: %4.4f, d_loss: %.8f" \
-            % (epoch, 
-                time.time() - start_time, (errD_fake+errD_real)/batch_idxs))
+                if epoch % 5 == 0 or epoch == params["pretraining_epoch"] - 1:
+                    self.save(checkpoint_dir, epoch)
+                print("Epoch: [%2d] time: %4.4f, d_loss: %.8f" \
+                % (epoch, 
+                    time.time() - start_time, (errD_fake+errD_real)/batch_idxs))
 
     def fine_tuning(self, params):
         def process_data(X, prev_X, y):

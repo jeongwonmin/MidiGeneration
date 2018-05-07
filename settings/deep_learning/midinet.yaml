@@ -1,13 +1,13 @@
 routine: deep_learning
 params:
-    data_dir: "/Users/MIN/my_workspace/MidiGeneration/data/hooktheory/small_dataset"
+    data_dir: "/Users/MIN/my_workspace/MidiGeneration/data/hooktheory"
     dataset_name: "hooktheory"
     npy_dir: #"/Users/MIN/my_workspace/MidiGeneration/results/20180324-154201/npy_data" # npy data dir
     result_dir: "/Users/MIN/my_workspace/MidiGeneration/results"
     sample_dir: "/Users/MIN/my_workspace/MidiGeneration/results/samples"
     checkpoint_dir:
     epoch: 10
-    class: "SmallDataMidiNet"
+    class: "MidiNet"
     learning_params:
         learning_rate: 0.00005
         beta1: 0.5
