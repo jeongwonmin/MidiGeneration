@@ -268,21 +268,35 @@ class SmallDataMidiNet(MidiNet):
                 y = tf.convert_to_tensor(batch_labels, np.float32)
                 prev = tf.convert_to_tensor(prev_batch_images, np.float32)
                 gen = self.generator(z, y, prev, reuse=True)
-                # filter with discriminator
-                d, d_logits, fm = self.discriminator(
-                    gen, y, reuse=True
-                )
-                d_np = d.eval()
-                gen_np = gen.eval()
-                gen_prev = np.array([
-                    np.zeros(gen_np[0].shape) if i % 8 == 0 
-                    else gen_np[i-1] for i in range(len(gen_np))
-                ])
 
-                # 8小節ごとに切って「直前の小説」を取っておく
-                filter_r = np.where(d_np>thres)[0]
-                gen_small = gen_small + gen_np[filter_r,:,:,:].tolist()
-                gen_y = gen_y + batch_labels[filter_r,:].tolist()
+                # if thres == 0, do not pass through the discriminator
+                if thres == 0:
+                    gen_np = gen.eval()
+                    gen_prev = np.array([
+                        np.zeros(gen_np[0].shape) if i % 8 == 0 
+                        else gen_np[i-1] for i in range(len(gen_np))
+                    ])
+
+                    gen_small = gen_small + gen_np.tolist()
+                    gen_y = gen_y + batch_labels.tolist()
+
+                else:
+                # filter with discriminator
+                    d, d_logits, fm = self.discriminator(
+                        gen, y, reuse=True
+                    )
+                    d_np = d.eval()
+                    gen_np = gen.eval()
+                    gen_prev = np.array([
+                        np.zeros(gen_np[0].shape) if i % 8 == 0 
+                        else gen_np[i-1] for i in range(len(gen_np))
+                    ])
+
+                    # 8小節ごとに切って「直前の小説」を取っておく
+                    filter_r = np.where(d_np>thres)[0]
+                    gen_small = gen_small + gen_np[filter_r,:,:,:].tolist()
+                    gen_y = gen_y + batch_labels[filter_r,:].tolist()
+                    
         gen_small = np.array(gen_small)
         gen_y = np.array(gen_y)
         gen_prev = np.concatenate((
