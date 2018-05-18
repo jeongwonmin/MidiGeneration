@@ -212,6 +212,15 @@ class SmallDataMidiNet(MidiNet):
         small_data_X, small_prev_X, small_data_y = \
             process_data(small_data_X, small_prev_X, small_data_y)
 
+        # novel: 正しくはfeature boost用の音楽
+        avgs = average_melodies(novel_data_X, novel_data_y)
+        print(avgs)
+        avg_np = np.array([a[1] for a in avgs])
+        avg_folder = os.path.join(self._path, "average")
+        if not os.path.exists(avg_folder):
+            os.makedirs(avg_folder)
+        np.save(os.path.join(avg_folder, "average.npy"), avg_np) 
+
         learning_rate = params["learning_params"]["learning_rate"]
         beta1 = params["learning_params"]["beta1"]
 

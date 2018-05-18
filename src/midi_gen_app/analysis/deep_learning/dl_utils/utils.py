@@ -180,3 +180,24 @@ def generation_test(sess, dcgan, config, option, prev_bar):
     samples = sess.run(dcgan.sampler, feed_dict={dcgan.z: z_sample, dcgan.y:sample_labels, dcgan.prev_bar:prev_batch_images})
 
     return samples
+
+def average_melody(X, y, chord):
+    idx = np.where(np.all(y==chord, axis=1))[0]
+    mean = np.mean(X[idx], axis=0)
+    return mean
+
+# average melodies for all chords(major, minor)
+def average_melodies(X, y):
+    def all_chord():
+        c = np.eye(12)
+        c = np.tile(c, (2,1))
+        mm = np.concatenate([np.ones(12), np.zeros(12)])
+        mm = mm[:,None]
+        chords = np.hstack([c, mm])
+        return chords
+
+    chords = all_chord()
+    avgs = [] # len(avgs) = 24 / list of tuple / (chord, average)
+    for c in chords:
+        avgs.append((c, average_melody(X, y, c)))
+    return avgs
