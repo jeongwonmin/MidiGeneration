@@ -26,3 +26,4 @@ params:
         c_dim: 1
         small_rate: 5 # novel:small=10:1
         pretrained_model: "/Users/MIN/my_workspace/MidiGeneration/results/20180507-001253/checkpoint" # 20180507-001253: 10epoch+10epoch # pretained model file(result/yyyyddmm-HHMMSS/checkpoint
+	threshold: 0.4 

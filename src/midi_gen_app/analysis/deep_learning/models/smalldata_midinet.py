@@ -46,6 +46,7 @@ class SmallDataMidiNet(MidiNet):
 
         self.small_rate = model_params["small_rate"]
         self.pretrained_model = model_params["pretrained_model"]
+        self.threshold = model_params["threshold"]
 
     def train(self, params):
         self.pretrain(params)
@@ -233,7 +234,7 @@ class SmallDataMidiNet(MidiNet):
         # generate by using small data -> filter by discriminator
         batch_idxs = len(small_data_X) // self.batch_size
         seed = 10000000
-        thres = 0.4 # sigmoid threshold
+        thres = self.threshold # sigmoid threshold
         while len(gen_small) <= small_batch_n:
             i = len(gen_small)
             if i % 20 == 0:
