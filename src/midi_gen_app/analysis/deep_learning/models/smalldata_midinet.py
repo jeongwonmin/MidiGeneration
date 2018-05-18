@@ -214,7 +214,6 @@ class SmallDataMidiNet(MidiNet):
 
         # novel: 正しくはfeature boost用の音楽
         avgs = average_melodies(novel_data_X, novel_data_y)
-        print(avgs)
         avg_np = np.array([a[1] for a in avgs])
         avg_folder = os.path.join(self._path, "average")
         if not os.path.exists(avg_folder):
@@ -226,12 +225,11 @@ class SmallDataMidiNet(MidiNet):
 
         # small batches (novel:small = small_rate:1)
         # if you don't use novel set, set small_rate=0
-        if self.small_rate != 0:
-            small_batch_n = len(novel_data_X) // self.small_rate
-        else:
-            small_batch_n = len(self.base_mels) // 50
-            print(small_batch_n)
- 
+
+        small_batch_n = 15000
+        real = (small_batch_n // (self.small_rate+1)) * self.small_rate
+        fake = small_batch_n - real
+
         # initialize with pretrained model                          
         # tf.global_variables_initializer().run(self.d_w)
         # tf.global_variables_initializer().run(self.g_w)
@@ -244,10 +242,10 @@ class SmallDataMidiNet(MidiNet):
         batch_idxs = len(small_data_X) // self.batch_size
         seed = 10000000
         thres = self.threshold # sigmoid threshold
-        while len(gen_small) <= small_batch_n:
+        while len(gen_small) <= fake // 2:
             i = len(gen_small)
             if i % 20 == 0:
-                print("small data length: {} / {}".format(i, small_batch_n))
+                print("small data length: {} / {}".format(i, fake))
             for idx in xrange(0, batch_idxs):
                 batch_images = \
                     small_data_X[idx*self.batch_size:(idx+1)*self.batch_size]
@@ -292,14 +290,32 @@ class SmallDataMidiNet(MidiNet):
             gen_small[:gen_small.shape[0]-1]
         ))
 
-        if self.small_rate != 0:
-            novel_small_X = np.r_[novel_data_X, small_data_X, gen_small]
-            novel_small_p = np.r_[novel_prev_X, small_prev_X, gen_prev] # prev: preparing...
-            novel_small_y = np.r_[novel_data_y, small_data_y, gen_y]
-        else:
-            novel_small_X = np.r_[small_data_X, gen_small]
-            novel_small_p = np.r_[small_prev_X, gen_prev] # prev: preparing...
-            novel_small_y = np.r_[small_data_y, gen_y]
+        gen_boosted = gen_small
+        for c, a in avgs:
+            idx = np.where(np.all(gen_y==c, axis=1))[0]
+            gen_boosted[idx] = gen_boosted[idx] + a
+
+        gen_boosted_prev = np.concatenate((
+            np.zeros(gen_boosted[0].shape)[None,:,:,:],
+            gen_boosted[:gen_boosted.shape[0]-1]
+        ))
+
+        fake_mel_folder = os.path.join(self._path, "fake_melody")
+        if not os.path.exists(fake_mel_folder):
+            os.makedirs(fake_mel_folder)
+
+        np.save(os.path.join(fake_mel_folder, "generated.npy"), gen_small)
+        np.save(os.path.join(fake_mel_folder, "boosted.npy"), gen_boosted)
+
+        small_len = len(small_data_X)
+        small_repeat = real // small_len
+        small_data_X = np.tile(small_data_X, (small_repeat, 1,1,1))
+        small_prev_X = np.tile(small_prev_X, (small_repeat, 1,1,1))
+        small_data_y = np.tile(small_data_y, (small_repeat, 1))
+
+        novel_small_X = np.r_[small_data_X, gen_small, gen_boosted]
+        novel_small_p = np.r_[small_prev_X, gen_prev, gen_boosted_prev] # prev: preparing...
+        novel_small_y = np.r_[small_data_y, gen_y, gen_y]
 
         novel_small_X, novel_small_p, novel_small_y = \
             shuffle(
