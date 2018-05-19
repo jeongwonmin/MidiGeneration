@@ -1,6 +1,7 @@
 import os
 import time
 from glob import glob
+from copy import deepcopy
 
 import numpy as np
 import tensorflow as tf
@@ -300,7 +301,7 @@ class SmallDataMidiNet(MidiNet):
                     
         gen_small = np.array(gen_small)
         gen_y = np.array(gen_y)
-        gen_boosted = gen_small
+        gen_boosted = deepcopy(gen_small)
         for c, a in avgs:
             idx = np.where(np.all(gen_y==c, axis=1))[0]
             gen_boosted[idx] = self.alpha * gen_boosted[idx] \
