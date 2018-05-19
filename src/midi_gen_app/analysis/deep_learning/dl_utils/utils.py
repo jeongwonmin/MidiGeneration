@@ -201,3 +201,12 @@ def average_melodies(X, y):
     for c in chords:
         avgs.append((c, average_melody(X, y, c)))
     return avgs
+
+def binary_melodies(X):
+    max_args = np.argmax(X, axis=2)
+    mel = np.zeros(X.shape)
+    for i in range(X.shape[0]):
+        for j in range(X.shape[1]):
+            for k in range(X.shape[3]):
+                mel[i,j,max_args[i,j,k],k] = 1
+    return mel

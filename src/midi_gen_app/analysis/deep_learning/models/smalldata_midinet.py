@@ -47,6 +47,7 @@ class SmallDataMidiNet(MidiNet):
         self.small_rate = model_params["small_rate"]
         self.pretrained_model = model_params["pretrained_model"]
         self.threshold = model_params["threshold"]
+        self.alpha = model_params["alpha_blend"] # alpha blend(boosting feature and generated melody)
 
     def train(self, params):
         self.pretrain(params)
@@ -299,15 +300,21 @@ class SmallDataMidiNet(MidiNet):
                     
         gen_small = np.array(gen_small)
         gen_y = np.array(gen_y)
+        gen_boosted = gen_small
+        for c, a in avgs:
+            idx = np.where(np.all(gen_y==c, axis=1))[0]
+            gen_boosted[idx] = self.alpha * gen_boosted[idx] \
+                + (1 - self.alpha) * a
+
+        # convert melodies to binary image
+
+        gen_small = binary_melodies(gen_small)
+        gen_boosted = binary_melodies(gen_boosted)
+
         gen_prev = np.concatenate((
             np.zeros(gen_small[0].shape)[None,:,:,:],
             gen_small[:gen_small.shape[0]-1]
         ))
-
-        gen_boosted = gen_small
-        for c, a in avgs:
-            idx = np.where(np.all(gen_y==c, axis=1))[0]
-            gen_boosted[idx] = gen_boosted[idx] + a
 
         gen_boosted_prev = np.concatenate((
             np.zeros(gen_boosted[0].shape)[None,:,:,:],
