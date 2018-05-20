@@ -6,7 +6,7 @@ import numpy as np
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-npy', help='your npy folder to convert to midi')
+parser.add_argument('npy', help='your npy folder to convert to midi')
 args = parser.parse_args()
 
 def save_midi(npy_file):
