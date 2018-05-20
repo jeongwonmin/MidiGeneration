@@ -49,6 +49,7 @@ class SmallDataMidiNet(MidiNet):
         self.pretrained_model = model_params["pretrained_model"]
         self.threshold = model_params["threshold"]
         self.alpha = model_params["alpha_blend"] # alpha blend(boosting feature and generated melody)
+        self.use_fake = model_params["use_fake"]
 
     def train(self, params):
         self.pretrain(params)
@@ -229,8 +230,13 @@ class SmallDataMidiNet(MidiNet):
         # if you don't use novel set, set small_rate=0
 
         small_batch_n = 15000
-        real = (small_batch_n // (self.small_rate+1)) * self.small_rate
-        fake = small_batch_n - real
+        if self.use_fake:
+            real = (small_batch_n // (self.small_rate+1)) * self.small_rate
+            fake = small_batch_n - real
+
+        else:
+            real = small_batch_n
+            fake = 0
 
         # initialize with pretrained model                          
         # tf.global_variables_initializer().run(self.d_w)
@@ -335,9 +341,15 @@ class SmallDataMidiNet(MidiNet):
         small_prev_X = np.tile(small_prev_X, (small_repeat, 1,1,1))
         small_data_y = np.tile(small_data_y, (small_repeat, 1))
 
-        novel_small_X = np.r_[small_data_X, gen_small, gen_boosted]
-        novel_small_p = np.r_[small_prev_X, gen_prev, gen_boosted_prev] # prev: preparing...
-        novel_small_y = np.r_[small_data_y, gen_y, gen_y]
+        if self.use_fake:
+            novel_small_X = np.r_[small_data_X, gen_small, gen_boosted]
+            novel_small_p = np.r_[small_prev_X, gen_prev, gen_boosted_prev] # prev: preparing...
+            novel_small_y = np.r_[small_data_y, gen_y, gen_y]
+
+        else:
+            novel_small_X = small_data_X
+            novel_small_p = small_prev_X
+            novel_small_y = small_data_y
 
         novel_small_X, novel_small_p, novel_small_y = \
             shuffle(
