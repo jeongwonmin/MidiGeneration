@@ -313,8 +313,24 @@ class SmallDataMidiNet(MidiNet):
             gen_boosted[idx] = self.alpha * gen_boosted[idx] \
                 + (1 - self.alpha) * a
 
-        # convert melodies to binary image
+        fake_mel_folder = os.path.join(self._path, "fake_melody")
+        if not os.path.exists(fake_mel_folder):
+            os.makedirs(fake_mel_folder)
 
+        np.save(
+            os.path.join(fake_mel_folder, "generated_original.npy"),
+            gen_small
+        )
+        np.save(
+            os.path.join(fake_mel_folder, "boosted_original.npy"),
+            gen_boosted
+        )
+        np.save(
+            os.path.join(fake_mel_folder, "labels.npy"),
+            gen_y
+        )
+            
+        # convert melodies to binary image
         gen_small = binary_melodies(gen_small)
         gen_boosted = binary_melodies(gen_boosted)
 
@@ -327,10 +343,6 @@ class SmallDataMidiNet(MidiNet):
             np.zeros(gen_boosted[0].shape)[None,:,:,:],
             gen_boosted[:gen_boosted.shape[0]-1]
         ))
-
-        fake_mel_folder = os.path.join(self._path, "fake_melody")
-        if not os.path.exists(fake_mel_folder):
-            os.makedirs(fake_mel_folder)
 
         np.save(os.path.join(fake_mel_folder, "generated.npy"), gen_small)
         np.save(os.path.join(fake_mel_folder, "boosted.npy"), gen_boosted)
