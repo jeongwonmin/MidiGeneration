@@ -40,74 +40,33 @@ class DeepLearning(object):
 
     def process_data(self, data_dir, dl_class_name):
         self.data_kwargs = {}
-        if dl_class_name == "MidiNet":
-            loader = BatchLoader(
+        def load_save(data_kwargs, category):
+            music_loader = BatchLoader(
                 MidiSplitter(MidiProcessor(MidiLoader(
                     data_dir,
+                    genres=[category]
             ))))
-            mels, mel_prevs, chords = loader()
-            self.data_kwargs.update({
-                "mels": mels,
-                "mel_prevs": mel_prevs,
-                "chords": chords,
-            })
+
+            mels, prevs, chords = music_loader()
+
             saver = NpySaver(
-                os.path.join(self._path, "npy_data"),
-                self.mels, self.mel_prevs, self.chords 
+                os.path.join(self._path, "npy_data", category),
+                mels, prevs, chords
             )
             saver()
+            data_kwargs.update({
+                "_".join([category, "mels"]): mels,
+                "_".join([category, "prevs"]): prevs,
+                "_".join([category, "chords"]): chords,
+            })
+
+        if dl_class_name == "MidiNet":
+            load_save(self.data_kwargs, "pops")
 
         elif dl_class_name == "SmallDataMidiNet":
-            base_loader = BatchLoader(
-                MidiSplitter(MidiProcessor(MidiLoader(
-                    data_dir,
-                    genres=["base"]
-            ))))
-
-            base_mels, base_prevs, base_chords = base_loader()
-            saver = NpySaver(
-                os.path.join(self._path, "npy_data", "base"),
-                self.mels, self.mel_prevs, self.chords 
-            )
-            saver()
-
-            self.data_kwargs.update({
-                "base_mels": base_mels,
-                "base_prevs": base_prevs,
-                "base_chords": base_chords,
-            })
-
-            novel_loader = BatchLoader(
-                MidiSplitter(MidiProcessor(MidiLoader(
-                    data_dir,
-                    genres=["novel"]
-            ))))
-
-            novel_mels, novel_prevs, novel_chords = novel_loader()
-            saver = NpySaver(
-                os.path.join(self._path, "npy_data", "novel"),
-                self.mels, self.mel_prevs, self.chords 
-            )
-            saver()
-
-            self.data_kwargs.update({
-                "novel_mels": novel_mels,
-                "novel_prevs": novel_prevs,
-                "novel_chords": novel_chords,
-            })
-
-            small_loader = BatchLoader(
-                MidiSplitter(MidiProcessor(MidiLoader(
-                    data_dir,
-                    genres=["small"]
-            ))))
-
-            small_mels, small_prevs, small_chords = small_loader()
-            self.data_kwargs.update({
-                "small_mels": small_mels,
-                "small_prevs": small_prevs,
-                "small_chords": small_chords,
-            })
+            load_save(self.data_kwargs, "base") 
+            load_save(self.data_kwargs, "novel")
+            load_save(self.data_kwargs, "small")
 
     def __call__(self, loader=None):
         model_class = {
