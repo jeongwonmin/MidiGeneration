@@ -242,94 +242,14 @@ class SmallDataMidiNet(MidiNet):
         # tf.global_variables_initializer().run(self.d_w)
         # tf.global_variables_initializer().run(self.g_w)
 
-        # generate from small dataset (only use filtered generation results)
-        gen_small = []
-        gen_y = []
-        gen_prev = [] # use the original previous melody
-        # generate by using small data -> filter by discriminator
-        batch_idxs = len(small_data_X) // self.batch_size
-        seed = 10000000
-        thres = self.threshold # sigmoid threshold
-        while len(gen_small) <= fake // 2:
-            i = len(gen_small)
-            if i % 20 == 0:
-                print("small data length: {} / {}".format(i, fake))
-            for idx in xrange(0, batch_idxs):
-                batch_images = \
-                    small_data_X[idx*self.batch_size:(idx+1)*self.batch_size]
-                prev_batch_images = \
-                    small_prev_X[idx*self.batch_size:(idx+1)*self.batch_size]
-                
-                batch_labels = \
-                    small_data_y[idx*self.batch_size:(idx+1)*self.batch_size]
-                '''
-                Note that the mu and sigma are set to (-1,1) in the experiment of the paper :
-                "MidiNet: A Convolutional Generative Adversarial Network for Symbolic-domain Music Generation"
-                However, the result are similar by using (0,1)
-                '''
-                np.random.seed(seed)
-                batch_z = np.random.normal(0, 1, [self.batch_size, self.z_dim]) \
-                            .astype(np.float32)
-                seed += 1
-
-                z = tf.convert_to_tensor(batch_z, np.float32)
-                y = tf.convert_to_tensor(batch_labels, np.float32)
-                prev = tf.convert_to_tensor(prev_batch_images, np.float32)
-                gen = self.generator(z, y, prev, reuse=True)
-
-                # if thres == 0, do not pass through the discriminator
-                if thres == 0:
-                    gen_np = gen.eval()
-                    gen_prev = np.array([
-                        np.zeros(gen_np[0].shape) if i % 8 == 0 
-                        else gen_np[i-1] for i in range(len(gen_np))
-                    ])
-
-                    gen_small = gen_small + gen_np.tolist()
-                    gen_y = gen_y + batch_labels.tolist()
-
-                else:
-                # filter with discriminator
-                    d, d_logits, fm = self.discriminator(
-                        gen, y, reuse=True
-                    )
-                    d_np = d.eval()
-                    gen_np = gen.eval()
-                    gen_prev = np.array([
-                        np.zeros(gen_np[0].shape) if i % 8 == 0 
-                        else gen_np[i-1] for i in range(len(gen_np))
-                    ])
-
-                    # 8小節ごとに切って「直前の小説」を取っておく
-                    filter_r = np.where(d_np>thres)[0]
-                    gen_small = gen_small + gen_np[filter_r,:,:,:].tolist()
-                    gen_y = gen_y + batch_labels[filter_r,:].tolist()
-                    
-        gen_small = np.array(gen_small)
-        gen_y = np.array(gen_y)
-        gen_boosted = deepcopy(gen_small)
-        for c, a in avgs:
-            idx = np.where(np.all(gen_y==c, axis=1))[0]
-            gen_boosted[idx] = self.alpha * gen_boosted[idx] \
-                + (1 - self.alpha) * a
-
-        fake_mel_folder = os.path.join(self._path, "fake_melody")
-        if not os.path.exists(fake_mel_folder):
-            os.makedirs(fake_mel_folder)
-
-        np.save(
-            os.path.join(fake_mel_folder, "generated_original.npy"),
-            gen_small
-        )
-        np.save(
-            os.path.join(fake_mel_folder, "boosted_original.npy"),
-            gen_boosted
-        )
-        np.save(
-            os.path.join(fake_mel_folder, "labels.npy"),
-            gen_y
-        )
-            
+        gen_small, gen_boosted, gen_y = \
+            self._make_fake_melody(
+                small_data_X,
+                small_prev_X,
+                small_data_y,
+                avgs,
+                fake
+            )
         # convert melodies to binary image
         gen_small = binary_melodies(gen_small)
         gen_boosted = binary_melodies(gen_boosted)
@@ -343,6 +263,8 @@ class SmallDataMidiNet(MidiNet):
             np.zeros(gen_boosted[0].shape)[None,:,:,:],
             gen_boosted[:gen_boosted.shape[0]-1]
         ))
+
+        fake_mel_folder = os.path.join(self._path, "fake_melody")
 
         np.save(os.path.join(fake_mel_folder, "generated.npy"), gen_small)
         np.save(os.path.join(fake_mel_folder, "boosted.npy"), gen_boosted)
@@ -460,6 +382,107 @@ class SmallDataMidiNet(MidiNet):
         # fine-tuning of discriminator
 
         print("fine tuning ended")
+
+    def _make_fake_melody(self, X, prev_X, data_y, avgs, fake_num):
+        # generate from small dataset (only use filtered generation results)
+        gen_passed = []
+        gen_y = []
+        gen_failed = [] # melodies which couldn't passed discriminator
+        gen_failed_y = [] # labels for gen_failed
+
+        # generate by using small data -> filter by discriminator
+        batch_idxs = len(X) // self.batch_size
+        seed = 10000000
+        thres = self.threshold # sigmoid threshold
+        while len(gen_passed) <= fake_num // 2:
+            i = len(gen_passed)
+            if i % 20 == 0:
+                print("small data length: {} / {}".format(i, fake_num))
+            for idx in xrange(0, batch_idxs):
+                batch_images = \
+                    X[idx*self.batch_size:(idx+1)*self.batch_size]
+                prev_batch_images = \
+                    prev_X[idx*self.batch_size:(idx+1)*self.batch_size]
+                
+                batch_labels = \
+                    data_y[idx*self.batch_size:(idx+1)*self.batch_size]
+                '''
+                Note that the mu and sigma are set to (-1,1) in the experiment of the paper :
+                "MidiNet: A Convolutional Generative Adversarial Network for Symbolic-domain Music Generation"
+                However, the result are similar by using (0,1)
+                '''
+                np.random.seed(seed)
+                batch_z = np.random.normal(0, 1, [self.batch_size, self.z_dim]) \
+                            .astype(np.float32)
+                seed += 1
+
+                z = tf.convert_to_tensor(batch_z, np.float32)
+                y = tf.convert_to_tensor(batch_labels, np.float32)
+                prev = tf.convert_to_tensor(prev_batch_images, np.float32)
+                gen = self.generator(z, y, prev, reuse=True)
+
+                # if thres == 0, do not pass through the discriminator
+                if thres == 0:
+                    gen_np = gen.eval()
+                    gen_passed = gen_passed + gen_np.tolist()
+                    gen_y = gen_y + batch_labels.tolist()
+
+                else:
+                # filter with discriminator
+                    d, d_logits, fm = self.discriminator(
+                        gen, y, reuse=True
+                    )
+
+                    d_np = d.eval()
+                    gen_np = gen.eval()
+                    # 8小節ごとに切って「直前の小説」を取っておく
+                    filter_r = np.where(d_np>thres)[0]
+                    gen_passed = gen_passed + gen_np[filter_r,:,:,:].tolist()
+                    gen_y = gen_y + batch_labels[filter_r,:].tolist()
+
+                    filter_fail = np.where(d_np <= thres)[0]
+                    gen_failed = gen_failed + gen_np[filter_fail,:,:,:].tolist()
+                    gen_failed_y = gen_failed_y \
+                        + batch_labels[filter_fail,:].tolist()
+
+        gen_passed = np.array(gen_passed)
+        gen_y = np.array(gen_y)
+        gen_boosted = deepcopy(gen_passed)
+        for c, a in avgs:
+            idx = np.where(np.all(gen_y==c, axis=1))[0]
+            gen_boosted[idx] = self.alpha * gen_boosted[idx] \
+                + (1 - self.alpha) * a
+
+        fake_mel_folder = os.path.join(self._path, "fake_melody")
+        if not os.path.exists(fake_mel_folder):
+            os.makedirs(fake_mel_folder)
+
+        np.save(
+            os.path.join(fake_mel_folder, "generated_original.npy"),
+            gen_passed
+        )
+        np.save(
+            os.path.join(fake_mel_folder, "boosted_original.npy"),
+            gen_boosted
+        )
+        np.save(
+            os.path.join(fake_mel_folder, "labels.npy"),
+            gen_y
+        )
+        
+        if len(gen_failed) > 0:
+            gen_failed = np.array(gen_failed)
+            gen_failed_y = np.array(gen_failed_y)
+            np.save(
+                os.path.join(fake_mel_folder, "generated_failed.npy"),
+                gen_failed
+            )
+            np.save(
+                os.path.join(fake_mel_folder, "labels_failed.npy"),
+                gen_failed_y
+            )
+
+        return gen_passed, gen_boosted,  gen_y
 
     def __call__(self, params):
         self.train(params)
