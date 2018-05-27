@@ -370,6 +370,10 @@ class SmallDataMidiNet(MidiNet):
                     np_name = os.path.join(gen_dir, np_name)
                     np.save(np_name, samples)
 
+                    label_name = np_name + "_label"
+                    label_name = os.path.join(gen_dir, label_name)
+                    np.save(label_name, sample_z)
+
                 if np.mod(counter, batch_idxs) == 1:
                     self.save(checkpoint_dir, counter)
             print("Epoch: [%2d] time: %4.4f, d_loss: %.8f" \

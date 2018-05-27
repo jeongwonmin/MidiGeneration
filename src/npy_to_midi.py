@@ -11,6 +11,8 @@ args = parser.parse_args()
 
 def save_midi(npy_file):
     npy_data = np.load(npy_file)
+    if len(npy_data.shape) != 4:
+        return
     npy_data = np.reshape(npy_data, (npy_data.shape[0], 16, 128))
     npy_data = np.transpose(npy_data, (0, 2, 1))
     save_name = os.path.splitext(os.path.basename(npy_file))[0]+".mid"
