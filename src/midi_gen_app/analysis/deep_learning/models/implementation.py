@@ -72,13 +72,14 @@ class Implementation(object):
                         os.path.join(checkpoint_dir, model_name),
                         global_step=step)
 
-    def load(self, checkpoint_dir):
+    def load(self, checkpoint_dir, task="train"):
         print(" [*] Reading checkpoints...")
 
         model_dir = "%s_%s" % (self.batch_size, self.output_w)
         checkpoint_dir = os.path.join(checkpoint_dir, model_dir)
 
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+        # self.saver = tf.train.import_meta_graph(checkpoint_dir)
         if ckpt and ckpt.model_checkpoint_path:
             ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
             self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))

@@ -65,31 +65,11 @@ class SmallDataMidiNet(MidiNet):
             X = np.transpose(X, (0,2,3,1))
             prev_X = np.transpose(prev_X, (0,2,3,1))
             return X, prev_X, y
-        learning_rate = params["learning_params"]["learning_rate"]
-        beta1 = params["learning_params"]["beta1"]
-
-        self.d_optim = tf.train.AdamOptimizer(
-            learning_rate=learning_rate, beta1=beta1
-        ).minimize(self.d_loss, var_list=self.d_vars)
-
-        self.g_optim = tf.train.AdamOptimizer(
-            learning_rate=learning_rate, beta1=beta1
-        ).minimize(self.g_loss, var_list=self.g_vars)
-                                  
-        tf.global_variables_initializer().run()
-
-        self.g_sum = tf.summary.merge([
-            self.z_sum, self.d__sum, 
-            self.G_sum, self.d_loss_fake_sum, self.g_loss_sum
-        ])
-        self.d_sum = tf.summary.merge([
-            self.z_sum, self.d_sum, 
-            self.d_loss_real_sum, self.d_loss_sum
-        ])
 
         logs_dir = os.path.join(self._path, "logs")
         self.writer = tf.summary.FileWriter(logs_dir, self.sess.graph)
 
+        #tf.global_variables_initializer().run()
         self.load(self.pretrained_model)
         print("Load SUCCESS")
 
@@ -117,9 +97,6 @@ class SmallDataMidiNet(MidiNet):
         if not os.path.exists(avg_folder):
             os.makedirs(avg_folder)
         np.save(os.path.join(avg_folder, "average.npy"), avg_np) 
-
-        learning_rate = params["learning_params"]["learning_rate"]
-        beta1 = params["learning_params"]["beta1"]
 
         gen_small, gen_boosted, gen_y = \
             self._make_fake_melody(
