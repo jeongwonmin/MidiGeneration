@@ -31,6 +31,7 @@ class SmallDataMidiNet(MidiNet):
         self.small_mels = data_kwargs["small_mels"] # preparing...
         self.small_prevs = data_kwargs["small_prevs"] # preparing...
         self.small_chords = data_kwargs["small_chords"] # preparing...
+        self.task = model_params["task"]
 
         self.batch_size = model_params["batch_size"]
         self.sample_size = model_params["sample_size"]
@@ -44,12 +45,12 @@ class SmallDataMidiNet(MidiNet):
         self.gfc_dim = model_params["gfc_dim"]
         self.dfc_dim = model_params["dfc_dim"]
         self.c_dim = model_params["c_dim"]
-
         self.small_rate = model_params["small_rate"]
         self.pretrained_model = model_params["pretrained_model"]
         self.threshold = model_params["threshold"]
         self.alpha = model_params["alpha_blend"] # alpha blend(boosting feature and generated melody)
         self.use_fake = model_params["use_fake"]
+        self.task = model_params["task"]
 
     def train(self, params):
         self.pretrain(params)
@@ -57,6 +58,78 @@ class SmallDataMidiNet(MidiNet):
         # fine tuning with novel set + small dataset
 
         # generate data
+
+    def generate_melody(self, params):
+        def process_data(X, prev_X, y):
+            X, prev_X, y = self.extract(X, prev_X, y)
+            X = np.transpose(X, (0,2,3,1))
+            prev_X = np.transpose(prev_X, (0,2,3,1))
+            return X, prev_X, y
+        learning_rate = params["learning_params"]["learning_rate"]
+        beta1 = params["learning_params"]["beta1"]
+
+        self.d_optim = tf.train.AdamOptimizer(
+            learning_rate=learning_rate, beta1=beta1
+        ).minimize(self.d_loss, var_list=self.d_vars)
+
+        self.g_optim = tf.train.AdamOptimizer(
+            learning_rate=learning_rate, beta1=beta1
+        ).minimize(self.g_loss, var_list=self.g_vars)
+                                  
+        tf.global_variables_initializer().run()
+
+        self.g_sum = tf.summary.merge([
+            self.z_sum, self.d__sum, 
+            self.G_sum, self.d_loss_fake_sum, self.g_loss_sum
+        ])
+        self.d_sum = tf.summary.merge([
+            self.z_sum, self.d_sum, 
+            self.d_loss_real_sum, self.d_loss_sum
+        ])
+
+        logs_dir = os.path.join(self._path, "logs")
+        self.writer = tf.summary.FileWriter(logs_dir, self.sess.graph)
+
+        self.load(self.pretrained_model)
+        print("Load SUCCESS")
+
+        novel_data_X = self.novel_mels
+        novel_prev_X = self.novel_prevs
+        novel_data_y = self.novel_chords
+        small_data_X = self.small_mels
+        small_prev_X = self.small_prevs
+        small_data_y = self.small_chords
+
+        novel_data_X, novel_prev_X, novel_data_y = \
+            process_data(novel_data_X, novel_prev_X, novel_data_y)
+
+        small_data_X, small_prev_X, small_data_y = \
+            process_data(small_data_X, small_prev_X, small_data_y)
+
+        small_data_X, small_prev_X, small_data_y = \
+            shuffle(
+                small_data_X, small_prev_X, small_data_y, random_state=1
+            )
+        # novel: 正しくはfeature boost用の音楽
+        avgs = average_melodies(novel_data_X, novel_data_y)
+        avg_np = np.array([a[1] for a in avgs])
+        avg_folder = os.path.join(self._path, "average")
+        if not os.path.exists(avg_folder):
+            os.makedirs(avg_folder)
+        np.save(os.path.join(avg_folder, "average.npy"), avg_np) 
+
+        learning_rate = params["learning_params"]["learning_rate"]
+        beta1 = params["learning_params"]["beta1"]
+
+        gen_small, gen_boosted, gen_y = \
+            self._make_fake_melody(
+                small_data_X,
+                small_prev_X,
+                small_data_y,
+                avgs,
+                fake_num=8*2,
+                save_folder="generated_melody"
+            )
 
     def pretrain(self, params):
         base_data_X = self.base_mels
@@ -387,7 +460,11 @@ class SmallDataMidiNet(MidiNet):
 
         print("fine tuning ended")
 
-    def _make_fake_melody(self, X, prev_X, data_y, avgs, fake_num):
+    def _make_fake_melody(
+        self, 
+        X, prev_X, data_y, avgs, 
+        fake_num, save_folder="fake_melody"
+    ):
         # generate from small dataset (only use filtered generation results)
         gen_passed = []
         gen_y = []
@@ -457,7 +534,7 @@ class SmallDataMidiNet(MidiNet):
             gen_boosted[idx] = self.alpha * gen_boosted[idx] \
                 + (1 - self.alpha) * a
 
-        fake_mel_folder = os.path.join(self._path, "fake_melody")
+        fake_mel_folder = os.path.join(self._path, save_folder)
         if not os.path.exists(fake_mel_folder):
             os.makedirs(fake_mel_folder)
 
@@ -489,4 +566,8 @@ class SmallDataMidiNet(MidiNet):
         return gen_passed, gen_boosted,  gen_y
 
     def __call__(self, params):
-        self.train(params)
+        if self.task == "train":
+            self.train(params)
+        elif self.task == "generation":
+            self.generate_melody(params)
+        
